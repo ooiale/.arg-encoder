@@ -37,7 +37,7 @@ from arb_builder.region_builders.arb_footse import build_footse_region
 from arb_builder.arb_header import ARBHeader
 
 from arb_builder.arragements.builder import build_arrangements_region
-
+from arb_builder.region_builders.arb_init_script import build_initscript_region
 
 # Configuration
 ARBS_DIR = Path("./arbs")
@@ -218,6 +218,12 @@ ARB_SECTIONS = [
         name="ARRANGEMENT",
         arg_attr="arrangements",
         build_func=build_arrangements_region,
+        required=False,
+    ),
+    SectionTest(
+        name="INIT_SCRIPT",
+        arg_attr="init_script",
+        build_func=build_initscript_region,
         required=False,
     ),
     # To add a new section, just add another SectionTest here!

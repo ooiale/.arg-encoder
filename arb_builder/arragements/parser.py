@@ -39,10 +39,32 @@ def parse_arrangement(lines: List[str]) -> Arrangements:
         Arrangements object containing all parsed entries
     """
     arrangements = Arrangements(arrangements=[])
+
+    # State for handling multi-line comments
+    in_multiline_comment = False
     
     for idx, line in enumerate(lines, 1):
         line = line.strip()
         if not line:
+            continue
+
+        # --- Handle multi-line comments /* ... */ ---
+        if line.startswith('/*'):
+            in_multiline_comment = True
+            # Check if comment ends on same line
+            if '*/' in line:
+                in_multiline_comment = False
+            continue
+        
+        if in_multiline_comment:
+            # Check if this line ends the comment
+            if '*/' in line:
+                in_multiline_comment = False
+            # Skip this line regardless
+            continue
+
+        # Skip single-line comments
+        if line.startswith('//'):
             continue
             
         # Extract the first word (entry type)
@@ -60,7 +82,7 @@ def parse_arrangement(lines: List[str]) -> Arrangements:
                 arrangements.arrangements.append(parsed_entry)
         except Exception as e:
             print(f"Error parsing {entry_type} at line {idx}: {e}")
-            print(f"  Line: {line[:100]}...")
+            print(f"  Line: {line[:120]}...")
             continue
     
     #print_arrangement_summary(arrangements)
@@ -73,14 +95,25 @@ def parse_entry_by_type(entry_type: str, line: str, line_num: int) -> Any:
     
     # Parse the line into tokens, respecting quoted strings
     tokens = parse_line_tokens(line)
+
     
     if entry_type == "CHECKPT":
         # CHECKPT id chkflag x y z rot infoflag motion_define event_script
+        # Sometimes chkflag comes as -1 instead of the expected flag string
+        chkflag_token = tokens[2]
+
+        try:
+            indexed_chkflag_value = int(chkflag_token)
+            # It's a number, so the string version is just the number as string
+        except ValueError:
+            # It's a string like "CP_MP1201_01" - look it up
+            indexed_chkflag_value = SCR_INC_ENUM_TABLE.get(chkflag_token, 0)
+
         return CHECKPT(
-            size=len(tokens) - 1,
+            size=9,
             id=strip_quotes(tokens[1]),
             chkflag=strip_quotes(tokens[2]),  # chkflag is an indexed string (int)
-            indexed_chkflag=int(SCR_INC_ENUM_TABLE.get(tokens[2], 0)),
+            indexed_chkflag=indexed_chkflag_value,
             x=parse_float(tokens[3]),
             y=parse_float(tokens[4]),
             z=parse_float(tokens[5]),
@@ -93,20 +126,42 @@ def parse_entry_by_type(entry_type: str, line: str, line_num: int) -> Any:
     elif entry_type == "ADDNODE":
         # ADDNODE node it3_path node_name float1 float2 float3 float4
         return ADDNODE(
-            size=len(tokens) - 1,
+            size=7,
             node=strip_quotes(tokens[1]),
             it3_path=strip_quotes(tokens[2]),
             node_name=strip_quotes(tokens[3]),
             float1=parse_float(tokens[4]),
             float2=parse_float(tokens[5]),
             float3=parse_float(tokens[6]),
-            float4=parse_float(tokens[7])
+            float4=parse_float(tokens[7]) if len(tokens) > 7 else 0.0
         )
     
+    elif entry_type == "EVATARI":
+        return EVATARI(
+            size=6,
+            evid=int(tokens[1]),
+            flag=int(tokens[2]),
+            flag_state=int(tokens[3]),
+            isyuka=int(tokens[4]),
+            oneshot=int(tokens[5]),
+            script=strip_quotes(tokens[6]),
+        )
+    
+    elif entry_type == "COLORNODE":
+
+        return COLORNODE(
+            size=5,
+            name=strip_quotes(tokens[1]),
+            target=strip_quotes(tokens[2]),
+            flag1=int(tokens[3]),
+            flag2=int(tokens[4]),
+            value=parse_float(tokens[5]),
+        )
+        
     elif entry_type == "GROUPOBJ":
         # GROUPOBJ node it3_1 it3_2 it3_3 unit_sizex unit_sizey argtype group_sizex group_sizey break_type key_item key_efx break_efx break_se damage randam userot sclmin sclmax
         return GROUPOBJ(
-            size=len(tokens) - 1,
+            size=19,
             node=strip_quotes(tokens[1]),
             it3_1=strip_quotes(tokens[2]),
             it3_2=strip_quotes(tokens[3]),
@@ -138,7 +193,7 @@ def parse_entry_by_type(entry_type: str, line: str, line_num: int) -> Any:
             return None  # Skip this entry entirely
         
         return MONS(
-            size=len(tokens) - 1,
+            size=13,
             id=id_value,
             name=strip_quotes(tokens[2]),
             param_define=strip_quotes(tokens[3]),
@@ -157,6 +212,15 @@ def parse_entry_by_type(entry_type: str, line: str, line_num: int) -> Any:
     elif entry_type == "TBOX":
         # TBOX id item num flag boxtype keyitem x y z r info_flag motion_define first_script event_script
         # Note: TBOX has fewer fields than the 12-field layout
+        key_item_token = tokens[6]
+
+        try:
+            indexed_key_item_value = int(key_item_token)
+        except ValueError:
+            # It's a string like "CP_MP1201_01" - look it up
+            indexed_key_item_value = ITEM_DEFINE_TABLE.get(key_item_token, -1)
+        
+        
         return TBOX(
             size= 14,
             id=strip_quotes(tokens[1]),
@@ -165,21 +229,54 @@ def parse_entry_by_type(entry_type: str, line: str, line_num: int) -> Any:
             num=int(tokens[3]),
             flag=parse_obj_flag(tokens[4], FLAG_ENUM_TABLE), # SOMETIMES NEEDS TO BE INDEXED
             boxtype=int(tokens[5]), 
-            keyitem=int(tokens[6]),
+            keyitem=indexed_key_item_value,
             x=parse_float(tokens[7]),
             y=parse_float(tokens[8]),
             z=parse_float(tokens[9]),
             r=parse_float(tokens[10]),
             info_flag=tokens[11],
             motion_define=strip_quotes(tokens[12]),
-            first_script="",
-            event_script=strip_quotes(tokens[13]) if len(tokens) > 13 else ""
+            event_script=strip_quotes(tokens[13]) if len(tokens) > 13 else "",
+            tbox_value="", 
+            # this weird field is not present in .arg but is always set to 'tbox' in the .arb
+        )
+    
+    elif entry_type == "TTBOX":
+        # TBOX id item num flag boxtype keyitem x y z r info_flag motion_define first_script event_script
+        # Note: TBOX has fewer fields than the 12-field layout
+        key_item_token = tokens[6]
+
+        try:
+            indexed_key_item_value = int(key_item_token)
+        except ValueError:
+            # It's a string like "CP_MP1201_01" - look it up
+            indexed_key_item_value = ITEM_DEFINE_TABLE.get(key_item_token, -1)
+        
+        
+        return TTBOX(
+            size= 14,
+            id=strip_quotes(tokens[1]),
+            item=strip_quotes(tokens[2]),
+            indexed_item=ITEM_DEFINE_TABLE.get(tokens[2], 0),
+            num=int(tokens[3]),
+            flag=parse_obj_flag(tokens[4], FLAG_ENUM_TABLE), # SOMETIMES NEEDS TO BE INDEXED
+            boxtype=int(tokens[5]), 
+            keyitem=indexed_key_item_value,
+            x=parse_float(tokens[7]),
+            y=parse_float(tokens[8]),
+            z=parse_float(tokens[9]),
+            r=parse_float(tokens[10]),
+            info_flag=tokens[11],
+            motion_define=strip_quotes(tokens[12]),
+            event_script=strip_quotes(tokens[13]) if len(tokens) > 13 else "",
+            tbox_value="", 
+            # this weird field is not present in .arg but is always set to 'ttbox' in the .arb
         )
     
     elif entry_type == "NPC":
         # NPC id name param_define flag x y z r info_flag motion_define first_script dead_script event_script
         return NPC(
-            size=len(tokens) - 1,
+            size= 13,
             id=strip_quotes(tokens[1]),
             name=strip_quotes(tokens[2]),
             param_define=strip_quotes(tokens[3]),
@@ -194,11 +291,43 @@ def parse_entry_by_type(entry_type: str, line: str, line_num: int) -> Any:
             dead_script=strip_quotes(tokens[12]),
             event_script=strip_quotes(tokens[13]) if len(tokens) > 13 else ""
         )
+
+    elif entry_type == "LODNODE":
+        """
+        LODNODE NearNode MiddleNode FarNode x y z DistanceNear DistanceFar
+        """
+        return LODNODE(
+            size=8,
+            near_node=strip_quotes(tokens[1]),
+            middle_node=strip_quotes(tokens[2]),
+            far_node=strip_quotes(tokens[3]),
+            x=parse_float(tokens[4]),
+            y=parse_float(tokens[5]),
+            z=parse_float(tokens[6]),
+            distance_near=parse_float(tokens[7]),
+            distance_far=parse_float(tokens[8]),
+        )
     
+    elif entry_type == "EVNODE":
+        """
+        EVNODE name display_name node_name se_type flag
+        
+        Example:
+        EVNODE "se_gim_lava1" "se_gim_lava1" "SE_locator1" "SE_ENV_LAVA_ONES" 1
+        """
+        return EVNODE(
+            size=5,
+            name=strip_quotes(tokens[1]),
+            display_name=strip_quotes(tokens[2]),
+            node_name=strip_quotes(tokens[3]),
+            se_type=strip_quotes(tokens[4]),
+            flag=int(tokens[5]),
+        )
+
     elif entry_type == "OBJ":
         # OBJ id name param_define flag x y z r info_flag motion_define first_script dead_script event_script
         return OBJ(
-            size=len(tokens) - 1,
+            size=13,
             id=strip_quotes(tokens[1]),
             name=strip_quotes(tokens[2]),
             param_define=strip_quotes(tokens[3]),
@@ -216,8 +345,9 @@ def parse_entry_by_type(entry_type: str, line: str, line_num: int) -> Any:
     
     elif entry_type == "EVBOX2":
         # EVBOX2 id name x y z width depth height rot unk1 event_script
+        cleaned_rot = re.sub(r'[^\d.-]', '', tokens[9]) # in mp4111.arg there is a ]0
         return EVBOX2(
-            size=len(tokens) - 1,
+            size=11,
             id=strip_quotes(tokens[1]),
             name=strip_quotes(tokens[2]),
             x=parse_float(tokens[3]),
@@ -226,7 +356,7 @@ def parse_entry_by_type(entry_type: str, line: str, line_num: int) -> Any:
             width=parse_float(tokens[6]),
             depth=parse_float(tokens[7]),
             height=parse_float(tokens[8]),
-            rot=parse_float(tokens[9]),
+            rot=parse_float(cleaned_rot),
             unk1=int(tokens[10]),
             event_script=strip_quotes(tokens[11]) if len(tokens) > 11 else ""
         )
@@ -234,7 +364,7 @@ def parse_entry_by_type(entry_type: str, line: str, line_num: int) -> Any:
     elif entry_type == "EVCIRCLE":
         # EVCIRCLE id name x y z radius height rot unk event_script
         return EVCIRCLE(
-            size=len(tokens) - 1,
+            size=10,
             id=strip_quotes(tokens[1]),
             name=strip_quotes(tokens[2]),
             x=parse_float(tokens[3]),
@@ -250,7 +380,7 @@ def parse_entry_by_type(entry_type: str, line: str, line_num: int) -> Any:
     elif entry_type == "ENVSE":
         # ENVSE seno uid settype vol allowstate dist_ratio x y z railnode evboxname
         return ENVSE(
-            size=len(tokens) - 1,
+            size=11,
             seno=strip_quotes(tokens[1]),
             indexed_seno=SE_ENUM_TABLE.get(SE_DEFINE_TABLE.get(tokens[1], 0), 0),
             uid=int(tokens[2]),
@@ -269,7 +399,7 @@ def parse_entry_by_type(entry_type: str, line: str, line_num: int) -> Any:
     elif entry_type == "MAPLIGHT":
 
         return MAPLIGHT(
-            size=len(tokens) - 1,
+            size=16,
             name=strip_quotes(tokens[1]),
             node=strip_quotes(tokens[2]),
             x=parse_float(tokens[3]),
@@ -291,7 +421,7 @@ def parse_entry_by_type(entry_type: str, line: str, line_num: int) -> Any:
     elif entry_type == "TALKPT":
 
         return TALKPT(
-            size=len(tokens) - 1,
+            size=6,
             id= strip_quotes(tokens[1]),
             name= strip_quotes(tokens[2]),
             x= parse_float(tokens[3]),
@@ -304,7 +434,7 @@ def parse_entry_by_type(entry_type: str, line: str, line_num: int) -> Any:
 
         
         return LIGHT3(
-            size=len(tokens) - 1,
+            size=19,
             name=strip_quotes(tokens[1]),
             node=strip_quotes(tokens[2]),
             x=parse_float(tokens[3]),
@@ -329,7 +459,7 @@ def parse_entry_by_type(entry_type: str, line: str, line_num: int) -> Any:
     elif entry_type == "CHRLIGHT":
         
         return CHRLIGHT(
-            size=len(tokens) - 1,
+            size=12,
             name=strip_quotes(tokens[1]),
             node=strip_quotes(tokens[2]),
             x=parse_float(tokens[3]),
@@ -347,7 +477,7 @@ def parse_entry_by_type(entry_type: str, line: str, line_num: int) -> Any:
     elif entry_type == "MAPEFX":
     
         return MAPEFX(
-            size=len(tokens) - 1,
+            size=12,
             efxno=strip_quotes(tokens[1]),  # Indexed string ID
             indexed_efxno=EFX_DEFINE_TABLE[tokens[1]],
             uid=int(tokens[2]),
@@ -369,10 +499,10 @@ def parse_entry_by_type(entry_type: str, line: str, line_num: int) -> Any:
         # IT SEEMS LIGHTTIME IS MULTIPLIED BY 30
         # IN MP4306 LIGHTITME = 30 BUT ITS 900 IN .ARB
         return FLOBJ(
-            size=len(tokens) - 1,
+            size=16,
             id=strip_quotes(tokens[1]),
             mode=int(tokens[2]),
-            lighttime=parse_float(tokens[3]),
+            lighttime=parse_float(tokens[3]) * 30,
             range=parse_float(tokens[4]),
             chargepow=parse_float(tokens[5]),
             x=parse_float(tokens[6]),
@@ -390,7 +520,7 @@ def parse_entry_by_type(entry_type: str, line: str, line_num: int) -> Any:
 
     elif entry_type == "EVENEMY":
         return EVENEMY(
-            size=len(tokens) - 1,
+            size=15,
             id=strip_quotes(tokens[1]),
             name=strip_quotes(tokens[2]),
             mode=int(tokens[3]),
@@ -410,7 +540,7 @@ def parse_entry_by_type(entry_type: str, line: str, line_num: int) -> Any:
     
     elif entry_type == "DOOR":
         return DOOR(
-            size=len(tokens) - 1,
+            size=13,
             id=strip_quotes(tokens[1]),
             doortype=int(tokens[2]),
             keyitem=int(tokens[3]),
@@ -424,6 +554,27 @@ def parse_entry_by_type(entry_type: str, line: str, line_num: int) -> Any:
             info_flag=tokens[11],
             motion_define=strip_quotes(tokens[12]),
             event_script=strip_quotes(tokens[13]) if len(tokens) > 13 else ""
+        )
+    
+    elif entry_type == "MARK":
+
+        id_token = tokens[2]
+
+        try:
+            indexed_id_value = int(id_token)
+        except ValueError:
+            # It's a string like "CP_MP1201_01" - look it up
+            indexed_id_value = SCR_INC_ENUM_TABLE.get(id_token, -1)
+        return MARK(
+            size = 7,
+            settype = strip_quotes(tokens[1]),
+            indexed_settype = SCR_INC_ENUM_TABLE.get(tokens[1], 0),
+            id = indexed_id_value,
+            x = parse_float(tokens[3]),
+            y = parse_float(tokens[4]),
+            z = parse_float(tokens[5]),
+            range = parse_float(tokens[6]),
+            param1 = int(tokens[7]) if len(tokens) > 7 else 0,
         )
 
     else:

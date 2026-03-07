@@ -894,8 +894,8 @@ def parse_footse(data_lines: list[str]) -> FootSE:
             FA_NORMAL
     """
 
-    if len(data_lines) != 1:
-        raise ValueError("[FOOTSE] must contain exactly one line")
+    if len(data_lines) < 1:
+        raise ValueError("[FOOTSE] must contain at least one line")
 
     value = data_lines[0].strip()
     if not value:
@@ -949,8 +949,8 @@ def parse_init_script(data_lines: list[str]) -> InitScript:
     return InitScript(script=script)
 
 def parse_fish_coll(data_lines: list[str]) -> FishColl:
-    if len(data_lines) != 1:
-        raise ValueError("[FISH_COLL] must contain exactly one line")
+    if len(data_lines) < 1:
+        raise ValueError("[FISH_COLL] must contain at least one line")
 
     value = data_lines[0].strip()
 

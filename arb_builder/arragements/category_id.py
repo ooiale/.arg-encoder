@@ -20,12 +20,18 @@ CATEGORY_IDS = {
     "EVCIRCLE": b"\x00\x02\x00\x00", # 00 02 00 00
     "ENVSE": b"\x00\x00\x90\x00", # 00 00 90 00
     "TBOX": b"\x10\x00\x00\x00", # 10 00 00 00
+    "TTBOX": b"\x10\x00\x00\x00", # 10 00 00 00
     "MAPEFX": b"\x00\x00\x00\x04", # 00 00 00 04
     "FLOBJ": b"\x12\x00\x00\x00", # 12 00 00 00
     "LIGHT3": b"\x00\x00\x60\x00", # 00 00 60 00
     "CHRLIGHT": b"\x00\x00\xf0\x00", # 00 00 f0 00
     "EVENEMY": b"\x00\x20\x00\x00", # 00 20 00 00
     "DOOR": b"\x20\x00\x00\x00", # 20 00 00 00
+    "MARK": b"\x00\x00\xb0\x00", # 00 00 b0 00
+    "LODNODE": b"\x00\x00\x00\x01", # 00 00 00 01
+    "EVNODE": b"\x00\x00\x70\x00", # 00 00 70 00
+    "EVATARI":  b"\x00\x00\xe0\x00", # 00 00 e0 00
+    "COLORNODE": b"\x00\x00\x00\x02", # 00 00 00 02
 }
 
 def get_category_id(entry):
@@ -53,6 +59,8 @@ def get_category_id(entry):
         return CATEGORY_IDS["ENVSE"]
     elif isinstance(entry, TBOX):
         return CATEGORY_IDS["TBOX"]
+    elif isinstance(entry, TTBOX):
+        return CATEGORY_IDS["TTBOX"]
     elif isinstance(entry, MAPEFX):
         return CATEGORY_IDS["MAPEFX"]
     elif isinstance(entry, FLOBJ):
@@ -65,5 +73,15 @@ def get_category_id(entry):
         return CATEGORY_IDS["EVENEMY"]
     elif isinstance(entry, DOOR):
         return CATEGORY_IDS["DOOR"]
+    elif isinstance(entry, MARK):
+        return CATEGORY_IDS["MARK"]
+    elif isinstance(entry, LODNODE):
+        return CATEGORY_IDS["LODNODE"]
+    elif isinstance(entry, EVNODE):
+        return CATEGORY_IDS["EVNODE"]
+    elif isinstance(entry, EVATARI):
+        return CATEGORY_IDS["EVATARI"]
+    elif isinstance(entry, COLORNODE):
+        return CATEGORY_IDS["COLORNODE"]
     else:
         raise ValueError(f"Unknown entry type: {type(entry).__name__}")

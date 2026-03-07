@@ -270,11 +270,17 @@ def test_and_generate_arb(arg_path: Path, arb_path: Path, output_path: Path = Pa
     try:
         # 1. Parse ARG
         arg_text = arg_path.read_text(encoding="shift-jis", errors="replace")
+
+
         parsed_arg = parse_arg(arg_text)
+
+        
+
         print(f"{'=' * 60}")
         print(f"PRINTING THE INFO FROM THE PARSED ARG:")
         for key, value in parsed_arg.__dict__.items():
-            print(f"key: {key}, value: {value}")
+            pass
+            #print(f"key: {key}, value: {value}")
         
         # 2. Read original ARB for comparison
         original_arb = arb_path.read_bytes()
@@ -401,7 +407,7 @@ def test_and_generate_arb(arg_path: Path, arb_path: Path, output_path: Path = Pa
 def main() -> None:
     """Main function to test and generate ARB file from hardcoded paths."""
     # Hardcoded paths as requested
-    mp_name = "mp1111"
+    mp_name = "mp6532m"
     arg_path = Path(rf"C:\Users\bxand\OneDrive\Desktop\ys 8 rando 2\ArbDecoding\args\{mp_name}.arg")
     arb_path = Path(rf"C:\Users\bxand\OneDrive\Desktop\ys 8 rando 2\ArbDecoding\arbs\{mp_name}.arb")
     output_path = Path("test.arb")

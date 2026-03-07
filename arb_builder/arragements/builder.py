@@ -14,6 +14,17 @@ from .category_id import get_category_id
 
 # ---------------------------------------------------------------------------
 # Binary helpers
+
+
+def _encode_raw_bytes(raw_bytes: bytes) -> bytes:
+    """Encode raw bytes directly as a string field."""
+    data = bytearray()
+    data += struct.pack("<H", 0x7FFF)  # ff 7f marker
+    data += struct.pack("<I", len(raw_bytes) + 1)  # length + null
+    data += raw_bytes
+    data += b"\x00"
+    return bytes(data)
+
 # ---------------------------------------------------------------------------
 
 def _encode_float(value: float) -> bytes:
@@ -56,7 +67,7 @@ def _encode_string(value: str) -> bytes:
         data += b"\x00"
         return bytes(data)
     
-    string_bytes = value.encode("shift-jis")
+    string_bytes = value.encode("shift-jis", errors="replace")
     
     data = bytearray()
     # Opcode: 0xFF7F (little-endian)
@@ -144,6 +155,23 @@ def _encode_entry(entry: Any) -> bytes:
         result += _encode_marker("float") + _encode_float(entry.float3)
         result += _encode_marker("float") + _encode_float(entry.float4)
     
+    elif entry_type == "EVATARI":
+        # EVATARI: evid, flag, flag_state, isyuka, oneshot, script
+        result += _encode_marker("int") + _encode_int_i32(entry.evid)
+        result += _encode_marker("int") + _encode_int_i32(entry.flag)
+        result += _encode_marker("int") + _encode_int_i32(entry.flag_state)
+        result += _encode_marker("int") + _encode_int_i32(entry.isyuka)
+        result += _encode_marker("int") + _encode_int_i32(entry.oneshot)
+        result += _encode_string(entry.script)
+    
+    elif entry_type == "COLORNODE":
+        # COLORNODE: name, target, flag1, flag2, value
+        result += _encode_string(entry.name)
+        result += _encode_string(entry.target)
+        result += _encode_marker("int") + _encode_int_i32(entry.flag1)
+        result += _encode_marker("int") + _encode_int_i32(entry.flag2)
+        result += _encode_marker("float") + _encode_float(entry.value)
+    
     elif entry_type == "GROUPOBJ":
         # GROUPOBJ: node, it3_1, it3_2, it3_3, unit_sizex, unit_sizey, argtype,
         #           group_sizex, group_sizey, break_type, key_item, key_efx,
@@ -199,8 +227,10 @@ def _encode_entry(entry: Any) -> bytes:
         result += _encode_string(entry.info_flag)
         result += _encode_string(entry.motion_define)
 
-        # Handle first_script based on ID prefix
-        if entry.id.startswith("RBOX"):
+        # Handle event_script based on ID prefix
+        if entry.event_script:
+            result += _encode_string(entry.event_script)
+        elif entry.id.startswith("RBOX"):
             # All RBOX entries (driftwood) get "\r\n"
             result += b"\xff\x7f" + struct.pack("<I", 3) + b"\x0d\x0a\x00"
         elif entry.id.startswith("TBOX"):
@@ -208,20 +238,78 @@ def _encode_entry(entry: Any) -> bytes:
             result += _encode_string("--------")
         else:
             # Default fallback
-            result += _encode_string(entry.first_script if entry.first_script else "--------")
+            result += _encode_string(entry.event_script if entry.event_script else "--------")
         
-        # Handle event_script - always "tbox" for TBOX/RBOX entries in your examples
+        # Handle tbox_value - always "tbox" for TBOX/RBOX entries in your examples
         if entry.id.startswith(("TBOX", "RBOX")):
             result += b"\xff\x7f" + struct.pack("<I", 5) + b"tbox\x00"
         else:
-            result += _encode_string(entry.event_script if entry.event_script else "")
+            result += _encode_string(entry.tbox_value if entry.tbox_value else "")
+        #result += _encode_string(entry.first_script)
+        #result += _encode_string(entry.event_script)
+
+
+
+    elif entry_type == "TTBOX":
+        # TBOX: id, item, num, flag, boxtype, keyitem, x, y, z, r, info_flag, motion_define, first_script, event_script
+        result += _encode_string(entry.id)
+        result += _encode_marker("int") + _encode_int_i32(entry.indexed_item)
+        result += _encode_marker("int") + _encode_int_i32(entry.num)
+        result += _encode_marker("int") + _encode_int_i32(entry.flag)
+        result += _encode_marker("int") + _encode_int_i32(entry.boxtype)
+        result += _encode_marker("int") + _encode_int_i32(entry.keyitem)
+        result += _encode_marker("float") + _encode_float(entry.x)
+        result += _encode_marker("float") + _encode_float(entry.y)
+        result += _encode_marker("float") + _encode_float(entry.z)
+        result += _encode_marker("float") + _encode_float(entry.r)
+        result += _encode_string(entry.info_flag)
+        result += _encode_string(entry.motion_define)
+
+        # Handle event_script based on ID prefix
+        if entry.event_script:
+            result += _encode_string(entry.event_script)
+        elif entry.id.startswith("RBOX"):
+            # All RBOX entries (driftwood) get "\r\n"
+            result += b"\xff\x7f" + struct.pack("<I", 3) + b"\x0d\x0a\x00"
+        elif entry.id.startswith("TBOX"):
+            # All TBOX entries (chests) get "--------"
+            result += _encode_string("--------")
+        else:
+            # Default fallback
+            result += _encode_string(entry.event_script if entry.event_script else "--------")
+        
+
+        result += b"\xff\x7f" + struct.pack("<I", 6) + b"ttbox\x00"
         #result += _encode_string(entry.first_script)
         #result += _encode_string(entry.event_script)
     
     elif entry_type == "NPC":
         # NPC: id, name, param_define, flag, x, y, z, r, info_flag, motion_define, first_script, dead_script, event_script
         result += _encode_string(entry.id)
-        result += _encode_string(entry.name)
+
+        # Special handling for ev_citizen entries with circled numbers
+        if entry.id and entry.id.startswith("ev_citizen"):
+            # Map of correct bytes for each ev_citizen entry
+            correct_bytes_map = {
+                "ev_citizen1": b'\x95\x89\x8f\x9d\x8e\xd2\x81\x69\x96\xba\x87\x41\x81\x6a',  # 娘②
+                "ev_citizen2": b'\x95\x89\x8f\x9d\x8e\xd2\x81\x69\x8f\xad\x8f\x97\x81\x6a',  # (different text)
+                "ev_citizen3": b'\x95\x89\x8f\x9d\x8e\xd2\x81\x69\x90\xc2\x94\x4e\x87\x41\x81\x6a',  # ②
+                "ev_citizen4": b'\x95\x89\x8f\x9d\x8e\xd2\x81\x69\x90\xc2\x94\x4e\x87\x40\x81\x6a',  # ①
+                "ev_citizen5": b'\x95\x89\x8f\x9d\x8e\xd2\x81\x69\x92\x86\x94\x4e\x92\x6a\x81\x6a',  # no circle
+                "ev_citizen6": b'\x95\x89\x8f\x9d\x8e\xd2\x81\x69\x98\x56\x90\x6c\x92\x6a\x81\x6a',  # no circle
+                "ev_citizen7": b'\x95\x89\x8f\x9d\x8e\xd2\x81\x69\x96\xba\x87\x40\x81\x6a',  # ①
+            }
+            
+            if entry.id in correct_bytes_map:
+                result += _encode_raw_bytes(correct_bytes_map[entry.id])
+            else:
+                # Fall back to normal encoding
+                result += _encode_string(entry.name)
+        else:
+            # Normal case
+            result += _encode_string(entry.name)
+
+        #result += _encode_string(entry.name)
         result += _encode_string(entry.param_define)
         result += _encode_marker("int") + _encode_int_i32(entry.flag)
         result += _encode_marker("float") + _encode_float(entry.x)
@@ -234,6 +322,24 @@ def _encode_entry(entry: Any) -> bytes:
         result += _encode_string(entry.dead_script)
         result += _encode_string(entry.event_script)
     
+    elif entry_type == "LODNODE":
+        # LODNODE: near_node, middle_node, far_node, x, y, z, distance_near, distance_far
+        result += _encode_string(entry.near_node)
+        result += _encode_string(entry.middle_node)
+        result += _encode_string(entry.far_node)
+        result += _encode_marker("float") + _encode_float(entry.x)
+        result += _encode_marker("float") + _encode_float(entry.y)
+        result += _encode_marker("float") + _encode_float(entry.z)
+        result += _encode_marker("float") + _encode_float(entry.distance_near)
+        result += _encode_marker("float") + _encode_float(entry.distance_far)
+    
+    elif entry_type == "EVNODE":
+        result += _encode_string(entry.name)
+        result += _encode_string(entry.display_name)
+        result += _encode_string(entry.node_name)
+        result += _encode_string(entry.se_type)
+        result += _encode_marker("int") + _encode_int_i32(entry.flag)
+
     elif entry_type == "OBJ":
         # OBJ: id, name, param_define, flag, x, y, z, r, info_flag, motion_define, first_script, dead_script, event_script
         result += _encode_string(entry.id)
@@ -427,6 +533,17 @@ def _encode_entry(entry: Any) -> bytes:
         result += _encode_string(entry.motion_define)
         result += _encode_string(entry.event_script)
 
+    elif entry_type == "MARK":
+        # MARK: settype (indexed), id, x, y, z, range, param1
+        # Note: We use indexed_settype, not the string version
+        result += _encode_marker("int") + _encode_int_i32(entry.indexed_settype)
+        result += _encode_marker("int") + _encode_int_i32(entry.id)
+        result += _encode_marker("float") + _encode_float(entry.x)
+        result += _encode_marker("float") + _encode_float(entry.y)
+        result += _encode_marker("float") + _encode_float(entry.z)
+        result += _encode_marker("float") + _encode_float(entry.range)
+        result += _encode_marker("int") + _encode_int_i32(entry.param1)
+
     else:
         raise ValueError(f"Unknown entry type: {entry_type}")
     
@@ -453,9 +570,6 @@ def build_arrangements_region(arrangement: Arrangements) -> bytes:
     
     # Build all entry sections first
     entry_sections = []
-    aux = 0
-    aux1 = 0
-    aux2 = 0
     
     for entry in arrangement.arrangements:
         # Encode the entry fields (with their markers)
@@ -480,9 +594,7 @@ def build_arrangements_region(arrangement: Arrangements) -> bytes:
         entry_section += field_data
         
         entry_sections.append(bytes(entry_section))
-        aux += len(entry_section)
-        aux1 += len(entry_section) - 2
-        aux2 = entry_section
+
     
     # Combine all entry sections
     total_payload = b''.join(entry_sections)
@@ -495,11 +607,7 @@ def build_arrangements_region(arrangement: Arrangements) -> bytes:
     output += total_payload
     
     print("================ TESTING VALUES =========================")
-    print(f"aux = {aux}")
-    print(f"aux1 = {aux1}")
-    print(f"aux1 + 4 = {aux1 + 4}")
-    print(f"total payload = {len(total_payload)}")
-    print(f"aux2 = {aux2}")
+    
     print("="*80)
 
     return bytes(output)

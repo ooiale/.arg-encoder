@@ -163,6 +163,27 @@ class CHECKPT:
     event_script: str
 
 @dataclass
+class EVATARI:
+    """Event atari (collision/hitbox) definition"""
+    size: int
+    evid: int
+    flag: int
+    flag_state: int
+    isyuka: int
+    oneshot: int
+    script: str
+
+@dataclass
+class COLORNODE:
+    """Color node definition for mist/atmospheric effects"""
+    size: int
+    name: str           # "pori_mist2"
+    target: str         # "mist_alpha"
+    flag1: int          # 0
+    flag2: int          # 0
+    value: float        # 1.0f
+
+@dataclass
 class GROUPOBJ:
     size: int
     node: str
@@ -218,8 +239,25 @@ class TBOX:
     r: float
     info_flag: str
     motion_define: str
-    first_script: str # appears to be leftout content so its always default to "--------"
     event_script: str
+    tbox_value: str
+
+@dataclass
+class TTBOX(TBOX):
+    """TTBOX entry (same as TBOX but with tbox_value = ttbox instead of tbox...)"""
+    pass
+    
+@dataclass
+class MARK:
+    size: int
+    settype: str
+    indexed_settype: int
+    id: int
+    x: float
+    y: float
+    z: float
+    range: float
+    param1: int
 
 
 @dataclass
@@ -238,6 +276,29 @@ class NPC:
     first_script: str
     dead_script: str
     event_script: str
+
+@dataclass
+class LODNODE:
+    """Level of Detail node definition"""
+    size: int
+    near_node: str
+    middle_node: str
+    far_node: str
+    x: float
+    y: float
+    z: float
+    distance_near: float
+    distance_far: float
+
+@dataclass
+class EVNODE:
+    # There is no name for the attributes in the .arg file I looked so these names it is
+    size: int
+    name: str                # "se_gim_lava1"
+    display_name: str        # "se_gim_lava1"
+    node_name: str           # "SE_locator1"
+    se_type: str             # "SE_ENV_LAVA_ONES"
+    flag: int
 
 @dataclass
 class DOOR:

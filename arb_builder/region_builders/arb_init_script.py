@@ -72,10 +72,16 @@ def build_initscript_region(initscript: InitScript) -> bytes:
     # Size field - from observed data, this is constant: 14 40 16 00 00 00
     # This is 6 bytes total (14 40 16 00 00 00)
     output += struct.pack("<H", 0x4014)  # 14 40 in little-endian
-    output += struct.pack("<I", 0x16)    # 16 00 00 00
+
+    
+    #output += struct.pack("<I", 0x16)    # 16 00 00 00
     
     # Encode the script string
     script_data = _encode_string(initscript.script)
+
+    # data lenght = data length field + string data
+    output += struct.pack("<I", 4 + len(script_data))
+
     output += script_data
     
     # Add terminator fc 7f

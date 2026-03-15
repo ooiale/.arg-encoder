@@ -38,7 +38,7 @@ def lookup_bgm(bgm_key: str, bgm_map: Optional[dict] = None) -> Optional[str]:
 
 def lookup_se(se_key: str, se_map: Optional[dict] = None) -> Optional[str]:
     script_dir = Path(__file__).resolve().parent
-    filename = "se_define.h"
+    filename = "3dicon_define.h"
     path = os.path.join(script_dir, filename)    
     bgm_map = parse_defines(path)
     return bgm_map.get(se_key, None)
@@ -51,7 +51,7 @@ if __name__ == "__main__":
 
     #result = lookup_bgm(user_input, bgm_map)
     result = lookup_bgm("BGM_4107")
-    result2 = lookup_se("SEFX_HILL")
+    result2 = lookup_se("ICON3D_MT_R1_FLOWER")
     reuslt3 = "ICON3D_MT_R1_FLOWER"
     if result:
         print(f" -> {result}")

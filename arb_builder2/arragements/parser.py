@@ -5,27 +5,8 @@ from dataclasses import dataclass, field
 import os
 from .classes import *
 
-from arb_builder.enum_helper.enum_parser import parse_c_enum
-from arb_builder.enum_helper.define_lookup import parse_defines
-SCR_INC_ENUM_PATH = "scr_inc_enum.h"
-SCR_INC_ENUM_TABLE = parse_c_enum(SCR_INC_ENUM_PATH)
-
-SE_ENUM_PATH = "se_enum.h"
-SE_DEFINE_PATH = "se_define.h"
-SE_DEFINE_TABLE = parse_defines(SE_DEFINE_PATH)
-SE_ENUM_TABLE = parse_c_enum(SE_ENUM_PATH)
-
-DEF_ENUM_PATH = "def_enum.h"
-DEF_ENUM_TABLE = parse_c_enum(DEF_ENUM_PATH)
-
-ITEM_DEFINE_PATH = "3dicon_define.h"
-ITEM_DEFINE_TABLE = parse_defines(ITEM_DEFINE_PATH)
-
-FLAG_ENUM_PATH = "flag_enum.h"
-FLAG_ENUM_TABLE = parse_c_enum(FLAG_ENUM_PATH)
-
-EFX_DEFINE_PATH = "efx_define.h"
-EFX_DEFINE_TABLE = parse_defines(EFX_DEFINE_PATH)
+from ..enum_reader import get_shared_resolver
+_ENUM = get_shared_resolver()
 
 
 def parse_arrangement(lines: List[str]) -> Arrangements:
@@ -79,7 +60,7 @@ def parse_arrangement(lines: List[str]) -> Arrangements:
         try:
             parsed_entry = parse_entry_by_type(entry_type, line, idx)
             if parsed_entry:
-                arrangements.arrangements.append(parsed_entry)
+                arrangements.add(parsed_entry)
         except Exception as e:
             print(f"Error parsing {entry_type} at line {idx}: {e}")
             print(f"  Line: {line[:120]}...")
@@ -107,7 +88,7 @@ def parse_entry_by_type(entry_type: str, line: str, line_num: int) -> Any:
             # It's a number, so the string version is just the number as string
         except ValueError:
             # It's a string like "CP_MP1201_01" - look it up
-            indexed_chkflag_value = SCR_INC_ENUM_TABLE.get(chkflag_token, 0)
+            indexed_chkflag_value = _ENUM.parse_id(chkflag_token)
 
         return CHECKPT(
             size=9,
@@ -218,16 +199,16 @@ def parse_entry_by_type(entry_type: str, line: str, line_num: int) -> Any:
             indexed_key_item_value = int(key_item_token)
         except ValueError:
             # It's a string like "CP_MP1201_01" - look it up
-            indexed_key_item_value = ITEM_DEFINE_TABLE.get(key_item_token, -1)
+            indexed_key_item_value = _ENUM.parse_id(key_item_token)
         
         
         return TBOX(
             size= 14,
             id=strip_quotes(tokens[1]),
             item=strip_quotes(tokens[2]),
-            indexed_item=ITEM_DEFINE_TABLE.get(tokens[2], 0),
+            indexed_item=_ENUM.parse_id(tokens[2]),
             num=int(tokens[3]),
-            flag=parse_obj_flag(tokens[4], FLAG_ENUM_TABLE), # SOMETIMES NEEDS TO BE INDEXED
+            flag=parse_obj_flag(tokens[4]), # SOMETIMES NEEDS TO BE INDEXED
             boxtype=int(tokens[5]), 
             keyitem=indexed_key_item_value,
             x=parse_float(tokens[7]),
@@ -250,16 +231,16 @@ def parse_entry_by_type(entry_type: str, line: str, line_num: int) -> Any:
             indexed_key_item_value = int(key_item_token)
         except ValueError:
             # It's a string like "CP_MP1201_01" - look it up
-            indexed_key_item_value = ITEM_DEFINE_TABLE.get(key_item_token, -1)
+            indexed_key_item_value = _ENUM.parse_id(key_item_token)
         
         
         return TTBOX(
             size= 14,
             id=strip_quotes(tokens[1]),
             item=strip_quotes(tokens[2]),
-            indexed_item=ITEM_DEFINE_TABLE.get(tokens[2], 0),
+            indexed_item=_ENUM.parse_id(tokens[2]),
             num=int(tokens[3]),
-            flag=parse_obj_flag(tokens[4], FLAG_ENUM_TABLE), # SOMETIMES NEEDS TO BE INDEXED
+            flag=parse_obj_flag(tokens[4]), # SOMETIMES NEEDS TO BE INDEXED
             boxtype=int(tokens[5]), 
             keyitem=indexed_key_item_value,
             x=parse_float(tokens[7]),
@@ -331,7 +312,7 @@ def parse_entry_by_type(entry_type: str, line: str, line_num: int) -> Any:
             id=strip_quotes(tokens[1]),
             name=strip_quotes(tokens[2]),
             param_define=strip_quotes(tokens[3]),
-            flag=parse_obj_flag(tokens[4], SCR_INC_ENUM_TABLE, FLAG_ENUM_TABLE),
+            flag=parse_obj_flag(tokens[4]),
             x=parse_float(tokens[5]),
             y=parse_float(tokens[6]),
             z=parse_float(tokens[7]),
@@ -382,10 +363,10 @@ def parse_entry_by_type(entry_type: str, line: str, line_num: int) -> Any:
         return ENVSE(
             size=11,
             seno=strip_quotes(tokens[1]),
-            indexed_seno=SE_ENUM_TABLE.get(SE_DEFINE_TABLE.get(tokens[1], 0), 0),
+            indexed_seno=_ENUM.parse_id(tokens[1]),
             uid=int(tokens[2]),
             settype=strip_quotes(tokens[3]),
-            indexed_settype=DEF_ENUM_TABLE.get(tokens[3], 0),
+            indexed_settype=_ENUM.parse_id(tokens[3]),
             vol=int(tokens[4]),
             allowstate=int(tokens[5]),
             dist_ratio=parse_float(tokens[6]),
@@ -503,10 +484,10 @@ def parse_entry_by_type(entry_type: str, line: str, line_num: int) -> Any:
         return MAPEFX(
             size=12,
             efxno=strip_quotes(tokens[1]),  # Indexed string ID
-            indexed_efxno=EFX_DEFINE_TABLE[tokens[1]],
+            indexed_efxno=_ENUM.parse_id(tokens[1]),
             uid=int(tokens[2]),
             type=strip_quotes(tokens[3]),   # Indexed string ID
-            indexed_type=SCR_INC_ENUM_TABLE[tokens[3]],
+            indexed_type=_ENUM.parse_id(tokens[3]),
             state=int(tokens[4]),
             freq=parse_float(tokens[5]),
             x=parse_float(tokens[6]),
@@ -588,11 +569,11 @@ def parse_entry_by_type(entry_type: str, line: str, line_num: int) -> Any:
             indexed_id_value = int(id_token)
         except ValueError:
             # It's a string like "CP_MP1201_01" - look it up
-            indexed_id_value = SCR_INC_ENUM_TABLE.get(id_token, -1)
+            indexed_id_value = _ENUM.parse_id(id_token,)
         return MARK(
             size = 7,
             settype = strip_quotes(tokens[1]),
-            indexed_settype = SCR_INC_ENUM_TABLE.get(tokens[1], 0),
+            indexed_settype = _ENUM.parse_id(tokens[1],),
             id = indexed_id_value,
             x = parse_float(tokens[3]),
             y = parse_float(tokens[4]),
@@ -674,15 +655,16 @@ def parse_flag(s: str) -> int:
     s = s.strip().strip('()')
     return int(s)
 
-def parse_obj_flag(flag_token: str, *enum_tables: Dict[str, int]) -> int:
+def parse_obj_flag(flag_token: str) -> int:
     """
     Parse an OBJ flag value, which can be either:
     - A simple integer in parentheses: (1), (-1)
     - An enum reference: (COOPEVID_MP1111)
     """
-    for table in enum_tables:
-        if flag_token in table:
-            return table[flag_token]
+    indexed = _ENUM.parse_id(flag_token)
+    if indexed != -999:
+        return indexed
+
 
     flag_token = flag_token.strip()
     
@@ -693,9 +675,9 @@ def parse_obj_flag(flag_token: str, *enum_tables: Dict[str, int]) -> int:
         # Check if it's an enum reference (starts with letters, not a number)
         if inner and not inner.lstrip('-').isdigit():
             # Look up in enum table
-            for enum_table in enum_tables:
-                if inner in enum_table:
-                    return enum_table[inner]
+            indexed = _ENUM.parse_id(inner)
+            if indexed != -999:
+                return indexed
             else:
                 print(f"Warning: Unknown enum '{inner}' in flag")
                 return -1  # Default fallback

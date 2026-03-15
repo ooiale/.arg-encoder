@@ -1,45 +1,46 @@
 import sys
 import os
+import logging
 from pathlib import Path
 from typing import Optional, Callable
 from dataclasses import dataclass
 
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(message)s')
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.CRITICAL) 
+
 # Add parent directory to path for imports
-
-from arb_builder.arg_parser import parse_arg, ARG
-from arb_builder.region_builders.arb_map import build_map_region
-from arb_builder.region_builders.arb_camera import build_camera_region
-from arb_builder.region_builders.arb_scrinclude import build_scr_include_region
-from arb_builder.region_builders.arb_mapset import build_mapset_region
-from arb_builder.region_builders.arb_grasstremble_unknownblob import build_grass_tremble_unknown_blob_region
-from arb_builder.region_builders.arb_grasstremble import build_grass_tremble_region
-from arb_builder.region_builders.arb_glare import build_glare_region
-from arb_builder.region_builders.arb_dof import build_dof_region
-from arb_builder.region_builders.arb_gradation import build_gradation_region
-from arb_builder.region_builders.arb_portal import build_portal_region
-from arb_builder.region_builders.arb_zplane import build_zplane_region
-from arb_builder.region_builders.arb_ssao import build_ssao_region
-from arb_builder.region_builders.arb_shadowbound import build_shadowbound_region
-from arb_builder.region_builders.arb_shadowsoft import build_shadowsoft_region
-from arb_builder.region_builders.arb_volumetrics import build_volumetrics_region
-from arb_builder.region_builders.arb_fogset import build_fogset_region
-from arb_builder.region_builders.arb_fogsetback import build_fogsetback_region
-from arb_builder.region_builders.arb_fogsetwater import build_fogsetwater_region
-from arb_builder.region_builders.arb_areaflag import build_areaflag_region
-from arb_builder.region_builders.arb_bgm import build_bgm_region
-from arb_builder.region_builders.arb_absence_of_sections import build_absence_of_sections_region
-from arb_builder.region_builders.arb_motion_include import build_motioninclude_region
-from arb_builder.region_builders.arb_null_section import build_nullsection_region
-from arb_builder.region_builders.arb_footse import build_footse_region
-
-
-from arb_builder.region_builders.arb_soundefx import build_soundefx_region
-from arb_builder.region_builders.arb_fishcoll import build_fishcoll_region
-
-from arb_builder.arb_header import ARBHeader
-
-from arb_builder.arragements.builder import build_arrangements_region
-from arb_builder.region_builders.arb_init_script import build_initscript_region
+from .arg_parser import parse_arg, ARG
+from .region_builders.arb_map import build_map_region
+from .region_builders.arb_camera import build_camera_region
+from .region_builders.arb_scrinclude import build_scr_include_region
+from .region_builders.arb_mapset import build_mapset_region
+from .region_builders.arb_grasstremble_unknownblob import build_grass_tremble_unknown_blob_region
+from .region_builders.arb_grasstremble import build_grass_tremble_region
+from .region_builders.arb_glare import build_glare_region
+from .region_builders.arb_dof import build_dof_region
+from .region_builders.arb_gradation import build_gradation_region
+from .region_builders.arb_portal import build_portal_region
+from .region_builders.arb_zplane import build_zplane_region
+from .region_builders.arb_ssao import build_ssao_region
+from .region_builders.arb_shadowbound import build_shadowbound_region
+from .region_builders.arb_shadowsoft import build_shadowsoft_region
+from .region_builders.arb_volumetrics import build_volumetrics_region
+from .region_builders.arb_fogset import build_fogset_region
+from .region_builders.arb_fogsetback import build_fogsetback_region
+from .region_builders.arb_fogsetwater import build_fogsetwater_region
+from .region_builders.arb_areaflag import build_areaflag_region
+from .region_builders.arb_bgm import build_bgm_region
+from .region_builders.arb_absence_of_sections import build_absence_of_sections_region
+from .region_builders.arb_motion_include import build_motioninclude_region
+from .region_builders.arb_null_section import build_nullsection_region
+from .region_builders.arb_footse import build_footse_region
+from .region_builders.arb_soundefx import build_soundefx_region
+from .region_builders.arb_fishcoll import build_fishcoll_region
+from .arb_header import ARBHeader
+from .arragements.builder import build_arrangements_region
+from .region_builders.arb_init_script import build_initscript_region
 
 
 @dataclass
@@ -225,29 +226,17 @@ ARB_SECTIONS = [
         build_func=build_initscript_region,
         required=False,
     ),
-    
-
-    # To add a new section, just add another SectionTest here!
-    # Example:
-    # SectionTest(
-    #     name="NEW_SECTION",
-    #     arg_attr="new_section_data",
-    #     build_func=build_new_section,
-    #     required=False
-    # ),
 ]
 """
-        
     SectionTest(
         name="SOUND_EFX",
         arg_attr="sound_efx",
         build_func=build_soundefx_region,
         required=False
     )
-    
 """
 
-def test_and_generate_arb(arg_path: Path, arb_path: Path, output_path: Path = Path("test.arb")) -> bool:
+def test_and_generate_arb(parsed_arg: ARG, arb_path: Path) -> bytes:
     """
     Test ARG to ARB conversion and write generated output to test.arb
     
@@ -259,28 +248,10 @@ def test_and_generate_arb(arg_path: Path, arb_path: Path, output_path: Path = Pa
     Returns:
         bool: True if all tests passed, False otherwise
     """
-    print(f"\n{'=' * 60}")
-    print(f"Testing: {arg_path.name} -> {arb_path.name}")
-    print(f"Writing output to: {output_path.name}")
-    print(f"{'=' * 60}")
 
-    all_tests_passed = True
     generated_data = b""
 
     try:
-        # 1. Parse ARG
-        arg_text = arg_path.read_text(encoding="shift-jis", errors="replace")
-
-
-        parsed_arg = parse_arg(arg_text)
-
-        
-
-        print(f"{'=' * 60}")
-        print(f"PRINTING THE INFO FROM THE PARSED ARG:")
-        for key, value in parsed_arg.__dict__.items():
-            pass
-            #print(f"key: {key}, value: {value}")
         
         # 2. Read original ARB for comparison
         original_arb = arb_path.read_bytes()
@@ -288,42 +259,33 @@ def test_and_generate_arb(arg_path: Path, arb_path: Path, output_path: Path = Pa
         
         # 3. Header regeneration test
         regenerated_header = original_header.to_bytes()
-        original_header_bytes = original_arb[:ARBHeader.SIZE]
-        
-        if original_header_bytes == regenerated_header:
-            print("✓ Header regeneration: PASSED")
-        else:
-            print("✗ Header regeneration: FAILED")
-            all_tests_passed = False
+
         
         # Start with header
         generated_data = regenerated_header
         offset = ARBHeader.SIZE
         section_sizes = []
         
-        print("\nSection Tests:")
+        logger.info("\nSection Tests:")
 
         # 4. Build all sections and compare
         for section in ARB_SECTIONS:
             section_data = None
             # If we are analyzing the unknown blob, dont do the check because it is not a arg section and its present always
             if not section.is_present(parsed_arg) and section.name != "GRASS_UNKNOWN_BLOB":
-                print(f"• {section.name} section not present in ARG (skipped)")
+                logger.info(f"• {section.name} section not present in ARG (skipped)")
 
                 if section.name in ("FOGSETBACK", "FOGSETWATER"):
-                    print("FOGSETWATER is not present, building the 1A4008 section")
+                    logger.info("FOGSETWATER is not present, building the 1A4008 section")
                     section_data = build_absence_of_sections_region(section_name=section.name)
                 else:
                     continue
-
-            
-
 
             if section.name == "GRASS_UNKNOWN_BLOB":
                 section_data = build_grass_tremble_unknown_blob_region(original_arb, offset)
 
                 if not section_data:
-                    print("• GRASS_UNKNOWN_BLOB not present")
+                    logger.info("• GRASS_UNKNOWN_BLOB not present")
                     continue
             elif section.name == "NULL_SECTION":
                 section_data = build_nullsection_region()
@@ -331,19 +293,9 @@ def test_and_generate_arb(arg_path: Path, arb_path: Path, output_path: Path = Pa
                 # Build this section's data
                 section_data = section.get_data(parsed_arg)
                 if section_data is None:
-                    print(f"• {section.name} section data is None (skipped)")
+                    logger.info(f"• {section.name} section data is None (skipped)")
                     continue
 
-            # Compare with original
-            original_section = original_arb[offset:offset + len(section_data)]
-            
-            if section_data == original_section:
-                print(f"✓ {section.name} data generation: PASSED")
-            else:
-                print(f"✗ {section.name} data generation: FAILED")
-                print(f"  Generated size: {len(section_data)}")
-                print(f"  Original size: {len(original_section)}")
-                all_tests_passed = False
             
             # Add to generated data
             generated_data += section_data
@@ -351,93 +303,41 @@ def test_and_generate_arb(arg_path: Path, arb_path: Path, output_path: Path = Pa
             section_sizes.append((section.name, len(section_data)))
 
         # 5. Write generated data to file
-        output_path.write_bytes(generated_data)
-        print(f"\n✓ Generated ARB written to: {output_path}")
-        print(f"  File size: {len(generated_data)} bytes")
+        #output_path.write_bytes(generated_data)
+        #logger.info(f"\n✓ Generated ARB written to: {output_path}")
+        logger.info(f"  File size: {len(generated_data)} bytes")
 
         # 6. Compare sizes
-        print(f"\nSize comparison:")
-        print(f"  Original ARB size: {len(original_arb)} bytes")
-        print(f"  Generated ARB size: {len(generated_data)} bytes")
-        print(f"  Difference: {len(original_arb) - len(generated_data)} bytes")
+        logger.info(f"\nSize comparison:")
+        logger.info(f"  Original ARB size: {len(original_arb)} bytes")
+        logger.info(f"  Generated ARB size: {len(generated_data)} bytes")
+        logger.info(f"  Difference: {len(original_arb) - len(generated_data)} bytes")
         
-        # 7. Check if we generated everything
-        if len(generated_data) == len(original_arb):
-            print(f"\n✅ Full regeneration successful!")
-            if generated_data == original_arb:
-                print("  Generated file is identical to original!")
-            else:
-                print("  Warning: Files have same size but different content")
-        else:
-            print(f"\n⚠️  Partial regeneration:")
-            print(f"  Original file has {len(original_arb) - len(generated_data)} more bytes")
-            print(f"  This could be due to:")
-            print(f"  - Sections not yet implemented")
-            print(f"  - Padding or alignment bytes")
-            print(f"  - Unknown data structures")
-
         # 8. Debug info
-        print("\nDebug info:")
-        print(f"  Header size: {ARBHeader.SIZE}")
+        logger.info("\nDebug info:")
+        logger.info(f"  Header size: {ARBHeader.SIZE}")
         total_generated = ARBHeader.SIZE
 
         for name, size in section_sizes:
-            print(f"  {name} size: {size}")
+            logger.info(f"  {name} size: {size}")
             total_generated += size
             
-        print(f"  Total generated: {total_generated}")
-        print(f"  Remaining in original: {len(original_arb) - total_generated}")
-        print("Not generating the generated bytes")
-        #print(f"  Generated bytes: {generated_data}")
+        logger.info(f"  Total generated: {total_generated}")
+        logger.info(f"  Remaining in original: {len(original_arb) - total_generated}")
+        #logger.info(f"  Generated bytes: {generated_data}")
 
     except Exception as e:
-        print(f"✗ Error processing files: {e}")
+        logger.info(f"✗ Error building ARB: {e}")
         import traceback
         traceback.print_exc()
-        all_tests_passed = False
-        
-        # Try to write whatever we generated before the error
-        if generated_data:
-            output_path.write_bytes(generated_data)
-            print(f"  Partial output written to {output_path}")
+        raise  # Re-raise the exception so the caller knows it failed
 
-    return all_tests_passed
+    return generated_data
 
 
 def main() -> None:
-    """Main function to test and generate ARB file from hardcoded paths."""
-    # Hardcoded paths as requested
-    mp_name = "mp4301c"
-    arg_path = Path(rf"C:\Users\bxand\OneDrive\Desktop\ys 8 rando 2\ArbDecoding\args\{mp_name}.arg")
-    arb_path = Path(rf"C:\Users\bxand\OneDrive\Desktop\ys 8 rando 2\ArbDecoding\arbs\{mp_name}.arb")
-    output_path = Path("test.arb")
+    pass
     
-    print("Starting ARB generation test with hardcoded paths:")
-    print(f"  Input ARG: {arg_path}")
-    print(f"  Original ARB: {arb_path}")
-    print(f"  Output ARB: {output_path}")
-    print(f"\nTesting {len(ARB_SECTIONS)} sections:", ", ".join(s.name for s in ARB_SECTIONS))
-    
-    # Check if files exist
-    if not arg_path.exists():
-        print(f"\n❌ Error: ARG file not found: {arg_path}")
-        sys.exit(1)
-    
-    if not arb_path.exists():
-        print(f"\n❌ Error: ARB file not found: {arb_path}")
-        sys.exit(1)
-    
-    # Run the test and generation
-    passed = test_and_generate_arb(arg_path, arb_path, output_path)
-    
-    if passed:
-        print(f"\n✅ All implemented tests passed!")
-        print(f"   Output file: {output_path.absolute()}")
-        sys.exit(0)
-    else:
-        print(f"\n❌ Some tests failed!")
-        print(f"   Partial output file: {output_path.absolute()}")
-        sys.exit(1)
 
 
 if __name__ == "__main__":

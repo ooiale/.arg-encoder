@@ -3,3 +3,8 @@ arbs/*
 /*.py
 /*.txt
 /*.arb
+__pycache__/
+*.pyc
+/arb_builder
+/arb_builder2/tests
+/arb_builder2/*.arg
